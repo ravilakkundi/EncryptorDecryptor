@@ -72,7 +72,6 @@ const ITERATIONS = 600000;
 const enc = new TextEncoder();
 const dec = new TextDecoder();
 
-// Helper: Uint8Array <-> Base64URL string (URL-safe format)
 function bytesToB64Url(bytes) {
   let bin = '';
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
@@ -105,7 +104,7 @@ async function deriveKey(passphrase, salt, usage) {
   );
 }
 
-// Decrypt Handler (Pure Plain Text Output)
+// Decrypt Handler - Pure String Processing (No JSON parsing)
 document.getElementById('decrypt').addEventListener('click', async () => {
   const status = document.getElementById('decStatus');
   status.textContent = '';
@@ -148,7 +147,7 @@ document.getElementById('decrypt').addEventListener('click', async () => {
       throw new Error('Decryption failed. Incorrect passphrase or corrupted token.');
     }
 
-    // Direct plain text output (no JSON parsing)
+    // Direct plain text extraction (Zero JSON parsing)
     const rawText = dec.decode(plaintextBuffer);
     document.getElementById('outPassword').value = rawText;
 
@@ -160,7 +159,7 @@ document.getElementById('decrypt').addEventListener('click', async () => {
   }
 });
 
-// Encrypt Handler (Pure Plain Text Input)
+// Encrypt Handler - Pure Plain Text
 document.getElementById('encrypt').addEventListener('click', async () => {
   const status = document.getElementById('encStatus');
   status.textContent = '';
@@ -192,7 +191,6 @@ document.getElementById('encrypt').addEventListener('click', async () => {
     status.textContent = 'Encryption complete! Copy the token above.';
     status.className = 'status success';
 
-    // Clear plaintext input after encryption
     document.getElementById('password1').value = '';
   } catch (e) {
     status.textContent = 'Error: ' + (e.message || 'Encryption failed.');
@@ -200,13 +198,11 @@ document.getElementById('encrypt').addEventListener('click', async () => {
   }
 });
 
-// Show / Hide text toggle
 document.getElementById('showPassword').addEventListener('click', () => {
   const p = document.getElementById('outPassword');
   p.type = p.type === 'password' ? 'text' : 'password';
 });
 
-// Clear all inputs on page unload / refresh
 window.addEventListener('beforeunload', () => {
   const ids = ['key1', 'key2', 'password1', 'encrypted', 'ciphertext', 'outPassword'];
   for (const id of ids) {
@@ -215,7 +211,6 @@ window.addEventListener('beforeunload', () => {
   }
 });
 
-// Environment check on load
 if (!crypto?.subtle) {
   const status = document.getElementById('decStatus');
   status.textContent = 'Warning: Web Crypto API is unavailable in this environment.';
