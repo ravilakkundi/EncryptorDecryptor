@@ -30,7 +30,7 @@ details summary { cursor: pointer; font-weight: 600; color: #0066cc; }
 
 <!-- SECTION 1: DECRYPTOR (PRIMARY FOR FAMILY USERS) -->
 <section>
-  <h2>1. Decrypt a Record</h2>
+  <h2>1. Decrypt a Token</h2>
   <label for="key2">Shared Family Passphrase</label>
   <input id="key2" type="password" placeholder="Enter shared passphrase" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 
@@ -42,39 +42,21 @@ details summary { cursor: pointer; font-weight: 600; color: #0066cc; }
 
   <hr style="margin: 20px 0; border: 0; border-top: 1px dashed #8886;">
 
-  <label for="outService">Service Name</label>
-  <input id="outService" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="—">
-
-  <label for="outUsername">Username / Account ID</label>
-  <input id="outUsername" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="—">
-
-  <label for="outPassword">Password</label>
+  <label for="outPassword">Decrypted Password / Text</label>
   <input id="outPassword" type="password" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="—">
-  <button id="showPassword" type="button" class="secondary">Show / Hide Password</button>
-
-  <label for="outNotes">Notes</label>
-  <textarea id="outNotes" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="—"></textarea>
+  <button id="showPassword" type="button" class="secondary">Show / Hide Text</button>
 </section>
 
 <!-- SECTION 2: ENCRYPTOR (SECONDARY / ADVANCED) -->
 <details>
-  <summary>Need to Encrypt a New Password? Click here to open Encryptor</summary>
+  <summary>Need to Encrypt a Password? Click here to open Encryptor</summary>
   <section style="margin-top: 14px;">
-    <h2>2. Encrypt a Record</h2>
+    <h2>2. Encrypt Plain Text / Password</h2>
     <label for="key1">Shared Family Passphrase</label>
     <input id="key1" type="password" placeholder="Enter shared passphrase" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
 
-    <label for="service1">Service Name (e.g. Netflix)</label>
-    <input id="service1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Service name">
-
-    <label for="username1">Username / Account Identifier (optional)</label>
-    <input id="username1" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Username or email">
-
-    <label for="password1">Password</label>
-    <input id="password1" type="password" autocomplete="new-password" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Password">
-
-    <label for="notes1">Notes (optional)</label>
-    <textarea id="notes1" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Additional notes"></textarea>
+    <label for="password1">Password / Plain Text to Encrypt</label>
+    <textarea id="password1" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Enter secret text or password"></textarea>
 
     <button id="encrypt">Encrypt to Token</button>
 
@@ -123,19 +105,12 @@ async function deriveKey(passphrase, salt, usage) {
   );
 }
 
-function clearOutputs() {
-  for (const id of ['outService', 'outUsername', 'outPassword', 'outNotes']) {
-    const el = document.getElementById(id);
-    if (el) el.value = '';
-  }
-}
-
-// Decrypt Handler
+// Decrypt Handler (Pure Plain Text Output)
 document.getElementById('decrypt').addEventListener('click', async () => {
   const status = document.getElementById('decStatus');
   status.textContent = '';
   status.className = 'status';
-  clearOutputs();
+  document.getElementById('outPassword').value = '';
 
   try {
     if (!crypto?.subtle) {
@@ -173,17 +148,11 @@ document.getElementById('decrypt').addEventListener('click', async () => {
       throw new Error('Decryption failed. Incorrect passphrase or corrupted token.');
     }
 
-    const p = JSON.parse(dec.decode(plaintextBuffer));
-    if (p.v !== 1 || typeof p.password !== 'string') {
-      throw new Error('Decrypted contents do not match expected record format.');
-    }
+    // Direct plain text output (no JSON parsing)
+    const rawText = dec.decode(plaintextBuffer);
+    document.getElementById('outPassword').value = rawText;
 
-    document.getElementById('outService').value = p.service || '';
-    document.getElementById('outUsername').value = p.username || '';
-    document.getElementById('outPassword').value = p.password || '';
-    document.getElementById('outNotes').value = p.notes || '';
-
-    status.textContent = 'Decryption successful. Password loaded.';
+    status.textContent = 'Decryption successful. Text loaded below.';
     status.className = 'status success';
   } catch (e) {
     status.textContent = 'Error: ' + (e.message || 'Decryption failed.');
@@ -191,7 +160,7 @@ document.getElementById('decrypt').addEventListener('click', async () => {
   }
 });
 
-// Encrypt Handler
+// Encrypt Handler (Pure Plain Text Input)
 document.getElementById('encrypt').addEventListener('click', async () => {
   const status = document.getElementById('encStatus');
   status.textContent = '';
@@ -203,23 +172,18 @@ document.getElementById('encrypt').addEventListener('click', async () => {
       throw new Error('Web Crypto API is unavailable. Ensure you are accessing via HTTPS or a secure context.');
     }
     const key = document.getElementById('key1').value;
-    const service = document.getElementById('service1').value.trim();
-    const username = document.getElementById('username1').value.trim();
-    const password = document.getElementById('password1').value;
-    const notes = document.getElementById('notes1').value;
+    const plainText = document.getElementById('password1').value;
 
     if (!key || key.length < 12) throw new Error('Shared passphrase must be at least 12 characters long.');
-    if (!service) throw new Error('Service name is required.');
-    if (!password) throw new Error('Password is required.');
+    if (!plainText) throw new Error('Password / text to encrypt is required.');
 
-    const payload = { v: 1, service, username, password, notes };
     const salt = randomBytes(16);
     const iv = randomBytes(12);
     const aesKey = await deriveKey(key, salt, 'encrypt');
     const ciphertext = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv, tagLength: 128 },
       aesKey,
-      enc.encode(JSON.stringify(payload))
+      enc.encode(plainText)
     );
 
     const token = `v1$${bytesToB64Url(salt)}$${bytesToB64Url(iv)}$${bytesToB64Url(new Uint8Array(ciphertext))}`;
@@ -228,7 +192,7 @@ document.getElementById('encrypt').addEventListener('click', async () => {
     status.textContent = 'Encryption complete! Copy the token above.';
     status.className = 'status success';
 
-    // Clear password input field after encryption
+    // Clear plaintext input after encryption
     document.getElementById('password1').value = '';
   } catch (e) {
     status.textContent = 'Error: ' + (e.message || 'Encryption failed.');
@@ -236,7 +200,7 @@ document.getElementById('encrypt').addEventListener('click', async () => {
   }
 });
 
-// Show / Hide password toggle
+// Show / Hide text toggle
 document.getElementById('showPassword').addEventListener('click', () => {
   const p = document.getElementById('outPassword');
   p.type = p.type === 'password' ? 'text' : 'password';
@@ -244,7 +208,7 @@ document.getElementById('showPassword').addEventListener('click', () => {
 
 // Clear all inputs on page unload / refresh
 window.addEventListener('beforeunload', () => {
-  const ids = ['key1', 'key2', 'service1', 'username1', 'password1', 'notes1', 'encrypted', 'ciphertext', 'outService', 'outUsername', 'outPassword', 'outNotes'];
+  const ids = ['key1', 'key2', 'password1', 'encrypted', 'ciphertext', 'outPassword'];
   for (const id of ids) {
     const el = document.getElementById(id);
     if (el) el.value = '';
