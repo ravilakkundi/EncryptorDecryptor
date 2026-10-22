@@ -1,3 +1,4 @@
+
 <!doctype html>
 <html lang="en">
 <head>
@@ -5,85 +6,206 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Family Password Vault</title>
 <style>
-:root { color-scheme: light dark; font: 16px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; }
-body { max-width: 720px; margin: 24px auto; padding: 0 16px; line-height: 1.5; }
+:root {
+  color-scheme: light dark;
+  font: 16px system-ui, -apple-system, BlinkMacSystemFont,
+        "Segoe UI", Roboto, sans-serif;
+}
+body {
+  max-width: 720px;
+  margin: 24px auto;
+  padding: 0 16px;
+  line-height: 1.5;
+}
 h1 { font-size: 1.6rem; margin-bottom: 6px; }
 h2 { font-size: 1.25rem; margin-top: 0; }
-p.note { font-size: 0.9rem; opacity: 0.85; margin-bottom: 20px; }
-section { border: 1px solid #8884; border-radius: 12px; padding: 20px; margin-bottom: 24px; background-color: rgba(127,127,127,0.03); }
-label { display: block; font-weight: 600; margin: 14px 0 6px; font-size: 0.95rem; }
-input, textarea, button { box-sizing: border-box; width: 100%; font: inherit; padding: 12px; border-radius: 8px; border: 1px solid #8888; background: transparent; color: inherit; }
-textarea { min-height: 80px; resize: vertical; }
-button { margin-top: 16px; cursor: pointer; font-weight: 600; background-color: #0066cc; color: #fff; border: none; transition: opacity 0.2s; }
-button:hover { opacity: 0.9; }
-button.secondary { background-color: transparent; color: inherit; border: 1px solid #8888; margin-top: 8px; font-weight: normal; font-size: 0.88rem; padding: 6px 12px; width: auto; display: inline-block; }
-.status { white-space: pre-wrap; overflow-wrap: anywhere; margin-top: 14px; font-weight: 500; font-size: 0.92rem; }
+p.note {
+  font-size: .9rem;
+  opacity: .85;
+  margin-bottom: 20px;
+}
+section {
+  border: 1px solid #8884;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 24px;
+  background-color: rgba(127,127,127,.03);
+}
+label {
+  display: block;
+  font-weight: 600;
+  margin: 14px 0 6px;
+  font-size: .95rem;
+}
+input, textarea, button {
+  box-sizing: border-box;
+  width: 100%;
+  font: inherit;
+  padding: 12px;
+  border-radius: 8px;
+  border: 1px solid #8888;
+  background: transparent;
+  color: inherit;
+}
+textarea { min-height: 100px; resize: vertical; }
+button {
+  margin-top: 16px;
+  cursor: pointer;
+  font-weight: 600;
+  background-color: #0066cc;
+  color: #fff;
+  border: none;
+  transition: opacity .2s;
+}
+button:hover { opacity: .9; }
+button.secondary {
+  background-color: transparent;
+  color: inherit;
+  border: 1px solid #8888;
+  margin-top: 8px;
+  font-weight: normal;
+  font-size: .88rem;
+  padding: 6px 12px;
+  width: auto;
+  display: inline-block;
+}
+.status {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  margin-top: 14px;
+  font-weight: 500;
+  font-size: .92rem;
+}
 .status.error { color: #e53935; }
 .status.success { color: #43a047; }
-details summary { cursor: pointer; font-weight: 600; color: #0066cc; }
+.status.info { opacity: .85; }
+details summary {
+  cursor: pointer;
+  font-weight: 600;
+  color: #0066cc;
+}
+.small-note {
+  font-size: .85rem;
+  opacity: .8;
+}
 </style>
 </head>
 <body>
 
 <h1>Family Password Vault</h1>
-<p class="note">Client-side zero-knowledge vault. Runs entirely inside your browser memory with zero server history.</p>
+<p class="note">
+  Client-side vault. Encryption and decryption run in your browser.
+  The passphrase and decrypted text are not intentionally sent to a server.
+</p>
 
-<!-- SECTION 1: DECRYPTOR (PRIMARY FOR FAMILY USERS) -->
+<!-- SECTION 1: DECRYPTOR -->
 <section>
   <h2>1. Decrypt a Token</h2>
+
   <label for="key2">Shared Family Passphrase</label>
-  <input id="key2" type="password" placeholder="Enter shared passphrase" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+  <input id="key2" type="password"
+         placeholder="Enter shared passphrase"
+         autocomplete="off" autocorrect="off"
+         autocapitalize="off" spellcheck="false">
 
-  <label for="ciphertext">Compact Encrypted Token</label>
-  <textarea id="ciphertext" placeholder="Paste token string here (e.g. v1$...)" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"></textarea>
+  <label for="ciphertext">WhatsApp Message or Encrypted Token</label>
+  <textarea id="ciphertext"
+    placeholder="Paste the entire WhatsApp message here, or paste just the v1$... token."
+    autocomplete="off" autocorrect="off"
+    autocapitalize="off" spellcheck="false"></textarea>
 
-  <button id="decrypt">Decrypt Token</button>
-  <div id="decStatus" class="status" role="status"></div>
+  <p class="small-note">
+    You can paste the complete WhatsApp message. The page will extract
+    the encrypted token automatically.
+  </p>
 
-  <hr style="margin: 20px 0; border: 0; border-top: 1px dashed #8886;">
+  <button id="decrypt" type="button">Decrypt Token</button>
+  <div id="decStatus" class="status" role="status" aria-live="polite"></div>
+
+  <hr style="margin:20px 0;border:0;border-top:1px dashed #8886;">
 
   <label for="outPassword">Decrypted Password / Text</label>
-  <input id="outPassword" type="password" readonly autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="—">
-  <button id="showPassword" type="button" class="secondary">Show / Hide Text</button>
+  <input id="outPassword" type="password" readonly
+         autocomplete="off" autocorrect="off"
+         autocapitalize="off" spellcheck="false"
+         placeholder="—">
+
+  <button id="showPassword" type="button" class="secondary">
+    Show / Hide Text
+  </button>
+
+  <button id="clearDecrypt" type="button" class="secondary">
+    Clear Decryption Fields
+  </button>
 </section>
 
-<!-- SECTION 2: ENCRYPTOR (SECONDARY / ADVANCED) -->
+<!-- SECTION 2: ENCRYPTOR -->
 <details>
   <summary>Need to Encrypt a Password? Click here to open Encryptor</summary>
-  <section style="margin-top: 14px;">
+  <section style="margin-top:14px;">
     <h2>2. Encrypt Plain Text / Password</h2>
+
     <label for="key1">Shared Family Passphrase</label>
-    <input id="key1" type="password" placeholder="Enter shared passphrase" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false">
+    <input id="key1" type="password"
+           placeholder="Enter shared passphrase"
+           autocomplete="off" autocorrect="off"
+           autocapitalize="off" spellcheck="false">
 
     <label for="password1">Password / Plain Text to Encrypt</label>
-    <textarea id="password1" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Enter secret text or password"></textarea>
+    <textarea id="password1"
+      autocorrect="off" autocapitalize="off" spellcheck="false"
+      autocomplete="off"
+      placeholder="Enter secret text or password"></textarea>
 
-    <button id="encrypt">Encrypt to Token</button>
+    <button id="encrypt" type="button">Encrypt to Token</button>
 
     <label for="encrypted">Generated Encrypted Token String</label>
-    <textarea id="encrypted" readonly autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Generated token will appear here..."></textarea>
-    <div id="encStatus" class="status" role="status"></div>
+    <textarea id="encrypted" readonly
+      autocorrect="off" autocapitalize="off"
+      spellcheck="false"
+      placeholder="Generated token will appear here..."></textarea>
+
+    <div id="encStatus" class="status" role="status" aria-live="polite"></div>
+
+    <button id="clearEncrypt" type="button" class="secondary">
+      Clear Encryption Fields
+    </button>
   </section>
 </details>
 
 <script>
 'use strict';
+
 const ITERATIONS = 600000;
 const enc = new TextEncoder();
-const dec = new TextDecoder();
+const dec = new TextDecoder('utf-8', { fatal: true });
 
 function bytesToB64Url(bytes) {
   let bin = '';
-  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
-  return btoa(bin).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  for (let i = 0; i < bytes.length; i++) {
+    bin += String.fromCharCode(bytes[i]);
+  }
+  return btoa(bin)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
 }
 
 function b64UrlToBytes(str) {
+  // Accept only unpadded Base64URL characters.
+  if (!str || !/^[A-Za-z0-9_-]+$/.test(str)) {
+    throw new Error('Invalid Base64URL component.');
+  }
+
   let base64 = str.replace(/-/g, '+').replace(/_/g, '/');
   while (base64.length % 4 !== 0) base64 += '=';
+
   const raw = atob(base64);
   const out = new Uint8Array(raw.length);
-  for (let i = 0; i < raw.length; i++) out[i] = raw.charCodeAt(i);
+
+  for (let i = 0; i < raw.length; i++) {
+    out[i] = raw.charCodeAt(i);
+  }
   return out;
 }
 
@@ -94,9 +216,21 @@ function randomBytes(n) {
 }
 
 async function deriveKey(passphrase, salt, usage) {
-  const material = await crypto.subtle.importKey('raw', enc.encode(passphrase), 'PBKDF2', false, ['deriveKey']);
+  const material = await crypto.subtle.importKey(
+    'raw',
+    enc.encode(passphrase),
+    'PBKDF2',
+    false,
+    ['deriveKey']
+  );
+
   return crypto.subtle.deriveKey(
-    { name: 'PBKDF2', salt, iterations: ITERATIONS, hash: 'SHA-256' },
+    {
+      name: 'PBKDF2',
+      salt,
+      iterations: ITERATIONS,
+      hash: 'SHA-256'
+    },
     material,
     { name: 'AES-GCM', length: 256 },
     false,
@@ -104,38 +238,101 @@ async function deriveKey(passphrase, salt, usage) {
   );
 }
 
-// Decrypt Handler - Pure String Processing (No JSON parsing)
-document.getElementById('decrypt').addEventListener('click', async () => {
-  const status = document.getElementById('decStatus');
-  status.textContent = '';
-  status.className = 'status';
+/*
+ * Extract exactly one v1$... token from either:
+ *  - a standalone token, or
+ *  - a complete WhatsApp message containing the token.
+ *
+ * Reject multiple tokens instead of guessing which record to decrypt.
+ */
+function extractToken(input) {
+  const text = String(input || '').trim();
+
+  if (!text) {
+    throw new Error('Paste the encrypted token or complete WhatsApp message.');
+  }
+
+  const tokenPattern =
+    /v1\$([A-Za-z0-9_-]+)\$([A-Za-z0-9_-]+)\$([A-Za-z0-9_-]+)/g;
+
+  const matches = [...text.matchAll(tokenPattern)];
+
+  if (matches.length === 0) {
+    throw new Error(
+      'No valid encrypted token was found. Expected v1$salt$iv$ciphertext.'
+    );
+  }
+
+  if (matches.length !== 1) {
+    throw new Error(
+      'Multiple encrypted tokens were found. Paste a message containing only one record.'
+    );
+  }
+
+  const token = matches[0][0];
+  const parts = token.split('$');
+
+  // Validate structure and expected AES-GCM component lengths.
+  const salt = b64UrlToBytes(parts[1]);
+  const iv = b64UrlToBytes(parts[2]);
+  const ciphertext = b64UrlToBytes(parts[3]);
+
+  if (salt.length !== 16) {
+    throw new Error('Invalid token: salt must be 16 bytes.');
+  }
+  if (iv.length !== 12) {
+    throw new Error('Invalid token: IV must be 12 bytes.');
+  }
+  if (ciphertext.length < 16) {
+    throw new Error('Invalid token: ciphertext is too short.');
+  }
+
+  return token;
+}
+
+function setStatus(id, message, type) {
+  const el = document.getElementById(id);
+  el.textContent = message;
+  el.className = 'status' + (type ? ' ' + type : '');
+}
+
+function clearDecryptionOutput() {
   document.getElementById('outPassword').value = '';
+}
+
+document.getElementById('decrypt').addEventListener('click', async () => {
+  const input = document.getElementById('ciphertext').value;
+  const passphrase = document.getElementById('key2').value;
+
+  clearDecryptionOutput();
+  setStatus('decStatus', '', '');
 
   try {
-    if (!crypto?.subtle) {
-      throw new Error('Web Crypto API is unavailable. Ensure you are accessing via HTTPS or a secure context.');
+    if (!window.crypto || !crypto.subtle) {
+      throw new Error(
+        'Web Crypto API unavailable. Open this page using HTTPS.'
+      );
     }
-    const key = document.getElementById('key2').value;
-    const token = document.getElementById('ciphertext').value.trim();
 
-    if (!key) throw new Error('Please enter the shared passphrase.');
-    if (!token) throw new Error('Please paste the encrypted token string.');
+    if (!passphrase) {
+      throw new Error('Please enter the shared family passphrase.');
+    }
 
+    const token = extractToken(input);
     const parts = token.split('$');
-    if (parts.length !== 4 || parts[0] !== 'v1') {
-      throw new Error('Invalid or unsupported token format. Expected format: v1$salt$iv$ciphertext');
-    }
 
-    let salt, iv, ciphertext;
-    try {
-      salt = b64UrlToBytes(parts[1]);
-      iv = b64UrlToBytes(parts[2]);
-      ciphertext = b64UrlToBytes(parts[3]);
-    } catch (e) {
-      throw new Error('Failed to decode Base64URL token string.');
-    }
+    const salt = b64UrlToBytes(parts[1]);
+    const iv = b64UrlToBytes(parts[2]);
+    const ciphertext = b64UrlToBytes(parts[3]);
 
-    const aesKey = await deriveKey(key, salt, 'decrypt');
+    setStatus(
+      'decStatus',
+      'Token found. Decrypting locally in your browser…',
+      'info'
+    );
+
+    const aesKey = await deriveKey(passphrase, salt, 'decrypt');
+
     let plaintextBuffer;
     try {
       plaintextBuffer = await crypto.subtle.decrypt(
@@ -143,58 +340,88 @@ document.getElementById('decrypt').addEventListener('click', async () => {
         aesKey,
         ciphertext
       );
-    } catch (e) {
-      throw new Error('Decryption failed. Incorrect passphrase or corrupted token.');
+    } catch (_) {
+      throw new Error(
+        'Decryption failed. Check the passphrase or confirm the token is complete and unchanged.'
+      );
     }
 
-    // Direct plain text extraction (Zero JSON parsing)
-    const rawText = dec.decode(plaintextBuffer);
+    let rawText;
+    try {
+      rawText = dec.decode(plaintextBuffer);
+    } catch (_) {
+      throw new Error('Decryption produced invalid text.');
+    }
+
     document.getElementById('outPassword').value = rawText;
 
-    status.textContent = 'Decryption successful. Text loaded below.';
-    status.className = 'status success';
+    setStatus(
+      'decStatus',
+      'Decryption successful. The encrypted token was extracted from the pasted text.',
+      'success'
+    );
   } catch (e) {
-    status.textContent = 'Error: ' + (e.message || 'Decryption failed.');
-    status.className = 'status error';
+    clearDecryptionOutput();
+    setStatus(
+      'decStatus',
+      'Error: ' + (e.message || 'Decryption failed.'),
+      'error'
+    );
   }
 });
 
-// Encrypt Handler - Pure Plain Text
+// Encrypt Handler — same token format and cryptographic parameters.
 document.getElementById('encrypt').addEventListener('click', async () => {
-  const status = document.getElementById('encStatus');
-  status.textContent = '';
-  status.className = 'status';
+  setStatus('encStatus', '', '');
   document.getElementById('encrypted').value = '';
 
   try {
-    if (!crypto?.subtle) {
-      throw new Error('Web Crypto API is unavailable. Ensure you are accessing via HTTPS or a secure context.');
+    if (!window.crypto || !crypto.subtle) {
+      throw new Error(
+        'Web Crypto API unavailable. Open this page using HTTPS.'
+      );
     }
+
     const key = document.getElementById('key1').value;
     const plainText = document.getElementById('password1').value;
 
-    if (!key || key.length < 12) throw new Error('Shared passphrase must be at least 12 characters long.');
-    if (!plainText) throw new Error('Password / text to encrypt is required.');
+    if (!key || key.length < 12) {
+      throw new Error(
+        'Shared passphrase must be at least 12 characters long.'
+      );
+    }
+    if (!plainText) {
+      throw new Error('Password / text to encrypt is required.');
+    }
 
     const salt = randomBytes(16);
     const iv = randomBytes(12);
     const aesKey = await deriveKey(key, salt, 'encrypt');
+
     const ciphertext = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv, tagLength: 128 },
       aesKey,
       enc.encode(plainText)
     );
 
-    const token = `v1$${bytesToB64Url(salt)}$${bytesToB64Url(iv)}$${bytesToB64Url(new Uint8Array(ciphertext))}`;
-    document.getElementById('encrypted').value = token;
+    const token =
+      `v1$${bytesToB64Url(salt)}$${bytesToB64Url(iv)}$` +
+      `${bytesToB64Url(new Uint8Array(ciphertext))}`;
 
-    status.textContent = 'Encryption complete! Copy the token above.';
-    status.className = 'status success';
+    document.getElementById('encrypted').value = token;
+    setStatus(
+      'encStatus',
+      'Encryption complete. Copy the generated token.',
+      'success'
+    );
 
     document.getElementById('password1').value = '';
   } catch (e) {
-    status.textContent = 'Error: ' + (e.message || 'Encryption failed.');
-    status.className = 'status error';
+    setStatus(
+      'encStatus',
+      'Error: ' + (e.message || 'Encryption failed.'),
+      'error'
+    );
   }
 });
 
@@ -203,18 +430,37 @@ document.getElementById('showPassword').addEventListener('click', () => {
   p.type = p.type === 'password' ? 'text' : 'password';
 });
 
+document.getElementById('clearDecrypt').addEventListener('click', () => {
+  for (const id of ['key2', 'ciphertext', 'outPassword']) {
+    document.getElementById(id).value = '';
+  }
+  setStatus('decStatus', 'Decryption fields cleared.', 'info');
+});
+
+document.getElementById('clearEncrypt').addEventListener('click', () => {
+  for (const id of ['key1', 'password1', 'encrypted']) {
+    document.getElementById(id).value = '';
+  }
+  setStatus('encStatus', 'Encryption fields cleared.', 'info');
+});
+
 window.addEventListener('beforeunload', () => {
-  const ids = ['key1', 'key2', 'password1', 'encrypted', 'ciphertext', 'outPassword'];
+  const ids = [
+    'key1', 'key2', 'password1',
+    'encrypted', 'ciphertext', 'outPassword'
+  ];
   for (const id of ids) {
     const el = document.getElementById(id);
     if (el) el.value = '';
   }
 });
 
-if (!crypto?.subtle) {
-  const status = document.getElementById('decStatus');
-  status.textContent = 'Warning: Web Crypto API is unavailable in this environment.';
-  status.className = 'status error';
+if (!window.crypto || !crypto.subtle) {
+  setStatus(
+    'decStatus',
+    'Warning: Web Crypto API is unavailable. Open this page using HTTPS.',
+    'error'
+  );
 }
 </script>
 </body>
