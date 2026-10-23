@@ -104,7 +104,7 @@ details summary {
   <label for="key2">Shared Family Passphrase</label>
   <input id="key2" type="password"
          placeholder="Enter shared passphrase"
-         autocomplete="off" autocorrect="off"
+         autocomplete="new-password" autocorrect="off"
          autocapitalize="off" spellcheck="false">
 
   <label for="ciphertext">WhatsApp Message or Encrypted Token</label>
@@ -324,9 +324,16 @@ function disableAllControls() {
 function clearAllSensitiveFields() {
   for (const id of ['key1', 'password1', 'encrypted', 'key2', 'ciphertext', 'outPassword']) {
     const el = $(id);
-    if (el) el.value = '';
+    if (el) {
+      el.value = '';
+      // Also clear the reflected value attribute in case a mobile browser restores form state.
+      if (el.hasAttribute('value')) el.setAttribute('value', '');
+    }
   }
   if ($('outPassword')) $('outPassword').type = 'password';
+  if (document.activeElement && typeof document.activeElement.blur === 'function') {
+    document.activeElement.blur();
+  }
 }
 
 function lockPage(message) {
@@ -359,6 +366,19 @@ function resetIdleTimer() {
   document.addEventListener(type, resetIdleTimer, { passive: true });
 });
 resetIdleTimer();
+
+// Show the security rules immediately on page load so family members know
+// this is a short-lived, one-use session before entering any secrets.
+setStatus(
+  'decStatus',
+  'Security notice: This page allows one decryption attempt. It locks after 60 seconds without activity, and decryption must begin within 2 minutes of opening or refreshing this page. Refresh to start a new session.',
+  'info'
+);
+setStatus(
+  'encStatus',
+  'Security notice: This page locks after 60 seconds without activity. Refresh to start a new session.',
+  'info'
+);
 
 function consumeDecryptSession() {
   sessionConsumed = true;
@@ -394,8 +414,13 @@ document.getElementById('decrypt').addEventListener('click', async () => {
   const input = $('ciphertext').value;
   const passphrase = $('key2').value;
   consumeDecryptSession();
+  // Clear and blur synchronously before expensive PBKDF2 work; mobile keyboards
+  // and password managers can otherwise make the field appear to retain focus/value.
   $('key2').value = '';
+  $('key2').setAttribute('value', '');
+  $('key2').blur();
   $('ciphertext').value = '';
+  $('ciphertext').setAttribute('value', '');
   clearDecryptionOutput();
   setStatus('decStatus', 'One-time decryption attempt in progress…', 'info');
 
@@ -413,11 +438,15 @@ document.getElementById('decrypt').addEventListener('click', async () => {
 
     setStatus('decStatus', 'Token found. Decrypting locally in your browser…', 'info');
     const aesKey = await deriveKey(passphrase, salt, 'decrypt');
+    // If the idle timer locked the page while PBKDF2 was running, do not continue.
+    if (pageLocked) return;
     let plaintextBuffer;
     try {
       plaintextBuffer = await crypto.subtle.decrypt(
         { name: 'AES-GCM', iv, tagLength: 128 }, aesKey, ciphertext
       );
+      // A mobile tab may have timed out while the asynchronous decrypt was running.
+      if (pageLocked) return;
     } catch (_) {
       throw new Error('Decryption failed. Check the passphrase or confirm the token is complete and unchanged. This attempt has been used. Refresh to retry.');
     }
@@ -429,6 +458,8 @@ document.getElementById('decrypt').addEventListener('click', async () => {
       throw new Error('Decryption produced invalid text. This attempt has been used. Refresh to retry.');
     }
 
+    // Final guard: never display a result after the inactivity lock has fired.
+    if (pageLocked) return;
     $('outPassword').value = rawText;
     $('showPassword').disabled = false;
     setStatus('decStatus', 'Decryption successful. This page cannot decrypt another token. The result will be cleared after 60 seconds.', 'success');
@@ -439,16 +470,29 @@ document.getElementById('decrypt').addEventListener('click', async () => {
   } finally {
     // Best-effort clearing; JavaScript cannot guarantee erasure of immutable strings from memory.
     $('key2').value = '';
+    $('key2').setAttribute('value', '');
+    $('key2').blur();
     $('ciphertext').value = '';
+    $('ciphertext').setAttribute('value', '');
   }
 });
 
 // If a tab is restored from the browser's back-forward cache or resumes after suspension,
 // re-check freshness before allowing any decryption.
 window.addEventListener('pageshow', event => {
-  if (event.persisted && !pageIsFresh()) {
-    lockPage('Restored page has expired. Refresh the page to start a fresh session.');
+  // Mobile Safari/Chrome may restore form controls from the back-forward cache.
+  // Never trust a restored passphrase field.
+  $('key2').value = '';
+  $('key2').setAttribute('value', '');
+  if (event.persisted && (!pageIsFresh() || sessionConsumed)) {
+    lockPage('Restored page has expired or was already used. Refresh to start a fresh session.');
   }
+});
+
+// Clear sensitive fields when the page is backgrounded or navigated away from.
+// pagehide is more reliable than beforeunload on many mobile browsers.
+window.addEventListener('pagehide', () => {
+  clearAllSensitiveFields();
 });
 document.addEventListener('visibilitychange', () => {
   if (!document.hidden && !pageIsFresh() && !sessionConsumed) {
@@ -483,12 +527,14 @@ document.getElementById('encrypt').addEventListener('click', async () => {
     const salt = randomBytes(16);
     const iv = randomBytes(12);
     const aesKey = await deriveKey(key, salt, 'encrypt');
+    if (pageLocked) return;
 
     const ciphertext = await crypto.subtle.encrypt(
       { name: 'AES-GCM', iv, tagLength: 128 },
       aesKey,
       enc.encode(plainText)
     );
+    if (pageLocked) return;
 
     const token =
       `v1$${bytesToB64Url(salt)}$${bytesToB64Url(iv)}$` +
