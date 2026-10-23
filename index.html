@@ -299,73 +299,160 @@ function clearDecryptionOutput() {
   document.getElementById('outPassword').value = '';
 }
 
-document.getElementById('decrypt').addEventListener('click', async () => {
-  const input = document.getElementById('ciphertext').value;
-  const passphrase = document.getElementById('key2').value;
+// Client-side session hardening. This is a deterrent, not a server-enforced security boundary.
+const PAGE_STARTED_AT = Date.now();
+const PAGE_MAX_AGE_MS = 2 * 60 * 1000;       // Decryption must start within 2 minutes of load.
+const IDLE_TIMEOUT_MS = 60 * 1000;           // Lock and clear all fields after 60 seconds idle.
+const RESULT_TIMEOUT_MS = 60 * 1000;         // Clear decrypted text 60 seconds after success.
+let sessionConsumed = false;
+let pageLocked = false;
+let decryptStarted = false;
+let idleTimer = null;
+let resultTimer = null;
 
+const $ = id => document.getElementById(id);
+
+function disableAllControls() {
+  document.querySelectorAll('input, textarea, button, summary').forEach(el => {
+    // summary cannot be disabled consistently, so disable the containing details instead.
+    if (el.tagName !== 'SUMMARY') el.disabled = true;
+  });
+  const details = document.querySelector('details');
+  if (details) details.open = false;
+}
+
+function clearAllSensitiveFields() {
+  for (const id of ['key1', 'password1', 'encrypted', 'key2', 'ciphertext', 'outPassword']) {
+    const el = $(id);
+    if (el) el.value = '';
+  }
+  if ($('outPassword')) $('outPassword').type = 'password';
+}
+
+function lockPage(message) {
+  if (pageLocked) return;
+  pageLocked = true;
+  sessionConsumed = true;
+  clearTimeout(idleTimer);
+  clearTimeout(resultTimer);
+  clearAllSensitiveFields();
+  disableAllControls();
+  setStatus('decStatus', message || 'Page locked for security. Refresh the page to start a new session.', 'error');
+  setStatus('encStatus', 'Page locked for security. Refresh the page to start a new session.', 'error');
+}
+
+function pageIsFresh() {
+  return (Date.now() - PAGE_STARTED_AT) <= PAGE_MAX_AGE_MS;
+}
+
+function resetIdleTimer() {
+  if (pageLocked) return;
+  clearTimeout(idleTimer);
+  idleTimer = setTimeout(() => {
+    lockPage('Locked after 60 seconds without activity. Refresh the page to start a new session.');
+  }, IDLE_TIMEOUT_MS);
+}
+
+// Activity only keeps the page alive while the user is actively using it; it does not
+// extend the absolute two-minute freshness window for decryption.
+['pointerdown', 'keydown', 'touchstart', 'input', 'paste'].forEach(type => {
+  document.addEventListener(type, resetIdleTimer, { passive: true });
+});
+resetIdleTimer();
+
+function consumeDecryptSession() {
+  sessionConsumed = true;
+  decryptStarted = true;
+  $('decrypt').disabled = true;
+  $('key2').disabled = true;
+  $('ciphertext').disabled = true;
+  // The secret inputs are cleared as soon as their values have been copied to local variables.
+  $('showPassword').disabled = true;
+  $('clearDecrypt').disabled = true;
+}
+
+function clearResultAfterTimeout() {
+  clearTimeout(resultTimer);
+  resultTimer = setTimeout(() => {
+    $('outPassword').value = '';
+    $('outPassword').type = 'password';
+    $('showPassword').disabled = true;
+    setStatus('decStatus', 'Decrypted text cleared after 60 seconds. Refresh to start a new session.', 'info');
+  }, RESULT_TIMEOUT_MS);
+}
+
+document.getElementById('decrypt').addEventListener('click', async () => {
+  if (pageLocked || sessionConsumed || decryptStarted) return;
+
+  // Reject stale tabs before reading or processing any secret.
+  if (!pageIsFresh()) {
+    lockPage('This page is older than 2 minutes. Refresh it to start a fresh session.');
+    return;
+  }
+
+  // Consume before any asynchronous work, preventing double-click/race reuse.
+  const input = $('ciphertext').value;
+  const passphrase = $('key2').value;
+  consumeDecryptSession();
+  $('key2').value = '';
+  $('ciphertext').value = '';
   clearDecryptionOutput();
-  setStatus('decStatus', '', '');
+  setStatus('decStatus', 'One-time decryption attempt in progress…', 'info');
 
   try {
     if (!window.crypto || !crypto.subtle) {
-      throw new Error(
-        'Web Crypto API unavailable. Open this page using HTTPS.'
-      );
+      throw new Error('Web Crypto API unavailable. Open this page using HTTPS.');
     }
-
-    if (!passphrase) {
-      throw new Error('Please enter the shared family passphrase.');
-    }
+    if (!passphrase) throw new Error('Please enter the shared family passphrase.');
 
     const token = extractToken(input);
     const parts = token.split('$');
-
     const salt = b64UrlToBytes(parts[1]);
     const iv = b64UrlToBytes(parts[2]);
     const ciphertext = b64UrlToBytes(parts[3]);
 
-    setStatus(
-      'decStatus',
-      'Token found. Decrypting locally in your browser…',
-      'info'
-    );
-
+    setStatus('decStatus', 'Token found. Decrypting locally in your browser…', 'info');
     const aesKey = await deriveKey(passphrase, salt, 'decrypt');
-
     let plaintextBuffer;
     try {
       plaintextBuffer = await crypto.subtle.decrypt(
-        { name: 'AES-GCM', iv, tagLength: 128 },
-        aesKey,
-        ciphertext
+        { name: 'AES-GCM', iv, tagLength: 128 }, aesKey, ciphertext
       );
     } catch (_) {
-      throw new Error(
-        'Decryption failed. Check the passphrase or confirm the token is complete and unchanged.'
-      );
+      throw new Error('Decryption failed. Check the passphrase or confirm the token is complete and unchanged. This attempt has been used. Refresh to retry.');
     }
 
     let rawText;
     try {
       rawText = dec.decode(plaintextBuffer);
     } catch (_) {
-      throw new Error('Decryption produced invalid text.');
+      throw new Error('Decryption produced invalid text. This attempt has been used. Refresh to retry.');
     }
 
-    document.getElementById('outPassword').value = rawText;
-
-    setStatus(
-      'decStatus',
-      'Decryption successful. The encrypted token was extracted from the pasted text.',
-      'success'
-    );
+    $('outPassword').value = rawText;
+    $('showPassword').disabled = false;
+    setStatus('decStatus', 'Decryption successful. This page cannot decrypt another token. The result will be cleared after 60 seconds.', 'success');
+    clearResultAfterTimeout();
   } catch (e) {
     clearDecryptionOutput();
-    setStatus(
-      'decStatus',
-      'Error: ' + (e.message || 'Decryption failed.'),
-      'error'
-    );
+    setStatus('decStatus', 'Error: ' + (e.message || 'Decryption failed.') + ' Refresh the page to start a new session.', 'error');
+  } finally {
+    // Best-effort clearing; JavaScript cannot guarantee erasure of immutable strings from memory.
+    $('key2').value = '';
+    $('ciphertext').value = '';
+  }
+});
+
+// If a tab is restored from the browser's back-forward cache or resumes after suspension,
+// re-check freshness before allowing any decryption.
+window.addEventListener('pageshow', event => {
+  if (event.persisted && !pageIsFresh()) {
+    lockPage('Restored page has expired. Refresh the page to start a fresh session.');
+  }
+});
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && !pageIsFresh() && !sessionConsumed) {
+    lockPage('This page has expired. Refresh the page to start a fresh session.');
   }
 });
 
@@ -430,10 +517,10 @@ document.getElementById('showPassword').addEventListener('click', () => {
 });
 
 document.getElementById('clearDecrypt').addEventListener('click', () => {
-  for (const id of ['key2', 'ciphertext', 'outPassword']) {
-    document.getElementById(id).value = '';
-  }
-  setStatus('decStatus', 'Decryption fields cleared.', 'info');
+  for (const id of ['key2', 'ciphertext', 'outPassword']) $(id).value = '';
+  $('outPassword').type = 'password';
+  // Deliberately do not reset sessionConsumed: clearing does not permit another attempt.
+  setStatus('decStatus', 'Fields cleared. This session remains one-use; refresh to decrypt again.', 'info');
 });
 
 document.getElementById('clearEncrypt').addEventListener('click', () => {
